@@ -13,7 +13,10 @@ exports.login = async (req, res) => {
   }
 
   try {
-    const [usuarios] = await pool.query('SELECT * FROM usuarios WHERE correo = ?', [email]);
+    const [usuarios] = await pool.query(
+      'SELECT id, correo, password, tipo FROM usuarios WHERE correo = ?',
+      [email]
+    );
 
     if (usuarios.length === 0) {
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -32,7 +35,14 @@ exports.login = async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    res.json({ token });
+    res.json({
+      token,
+      user: {
+        id: usuario.id,
+        email: usuario.correo,
+        type: usuario.tipo
+      }
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
