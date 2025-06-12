@@ -60,7 +60,7 @@ exports.crearContrato = async (req, res) => {
   const user = req.user;
 
   try {
-    if (user.type !== 'client') {
+    if (user.type !== 'cliente') {
       return res.status(403).json({ message: 'Only clients can hire services' });
     }
 
