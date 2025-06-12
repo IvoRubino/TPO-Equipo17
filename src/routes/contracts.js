@@ -9,6 +9,8 @@ const crearMulter = require('../utils/multer');
 
 const uploadFiles = crearMulter('contract-files');
 
+//get que usa token para traer contrataciones
+router.get('/', verificarToken, contractsController.obtenerContrataciones);
 
 //permite a cliente contratar servicio
 router.post('/', verificarToken, permitirRol('cliente'),  validarBodyNoVacio, contractsController.crearContrato);

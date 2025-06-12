@@ -175,136 +175,117 @@ exports.obtenerServicioPorId = async (req, res) => {
 
 //ACTUALIZAR PARA IMAGENES Y ZONA NO SEA NULL CUANDO SE CREA UN SERVICIO VIRTUAL (ya deberia estar actualizado...!)
 exports.crearServicio = async (req, res) => {
-  const entrenador_id = req.user.id;
+  const trainer_id = req.user.id;
   const {
-    categoria,
-    descripcion,
-    duracion_minutos,
-    cantidad_sesiones,
-    precio,
-    modalidad,
-    zona,
-    direccion,
-    dias,
-    horario_inicio,
-    horario_fin
+    category,
+    description,
+    duration_minutes,
+    session_count,
+    price,
+    mode,
+    zone,
+    address,
+    days,
+    start_time,
+    end_time
   } = req.body;
 
-  // Validación básica
-  if (!categoria || !descripcion || !duracion_minutos || !cantidad_sesiones || !precio || !modalidad || !dias) {
-    return res.status(400).json({ message: 'Faltan campos obligatorios' });
+  if (!category || !description || !duration_minutes || !session_count || !price || !mode || !days) {
+    return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  if (!['virtual', 'presencial'].includes(modalidad)) {
-    return res.status(400).json({ message: 'La modalidad debe ser "virtual" o "presencial"' });
+  if (!['virtual', 'presencial'].includes(mode)) {
+    return res.status(400).json({ message: 'Mode must be either "virtual" or "presencial"' });
   }
 
-  if (modalidad === 'presencial' && (!direccion || !zona)) {
-    return res.status(400).json({ message: 'Zona y dirección son obligatorias en modalidad presencial' });
+  if (mode === 'presencial' && (!address || !zone)) {
+    return res.status(400).json({ message: 'Zone and address are required for presencial mode' });
   }
 
-  // Validación de horarios
-  if (!horario_inicio || !horario_fin) {
-    return res.status(400).json({ message: 'Se debe indicar el horario de inicio y fin' });
+  if (!start_time || !end_time) {
+    return res.status(400).json({ message: 'Start and end time are required' });
   }
 
-  const regexHora = /^([01]\d|2[0-3]):([0-5]\d)$/;
-  if (!regexHora.test(horario_inicio) || !regexHora.test(horario_fin)) {
-    return res.status(400).json({ message: 'El horario debe tener formato HH:MM (ej: 09:30)' });
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  if (!timeRegex.test(start_time) || !timeRegex.test(end_time)) {
+    return res.status(400).json({ message: 'Time must be in HH:MM format (e.g., 09:30)' });
   }
 
-  if (horario_inicio >= horario_fin) {
-    return res.status(400).json({ message: 'El horario de inicio debe ser anterior al de fin' });
+  if (start_time >= end_time) {
+    return res.status(400).json({ message: 'Start time must be before end time' });
   }
 
-  // Validación de días
-  const diasValidos = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-  const diasFiltrados = Array.isArray(dias)
-    ? dias.filter((d) => diasValidos.includes(d))
-    : [];
+  const validDays = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+  const selectedDays = Array.isArray(days) ? days.filter((d) => validDays.includes(d)) : [];
 
-  if (diasFiltrados.length === 0) {
-    return res.status(400).json({ message: 'Debés seleccionar al menos un día válido' });
+  if (selectedDays.length === 0) {
+    return res.status(400).json({ message: 'At least one valid day is required' });
   }
 
   try {
-    // Obtener ID de la categoría
-    const [catResult] = await pool.query(
-      'SELECT id FROM categorias WHERE nombre = ?',
-      [categoria]
-    );
-    if (catResult.length === 0) {
-      return res.status(400).json({ message: 'La categoría no existe' });
+    const [categoryResult] = await pool.query('SELECT id FROM categorias WHERE nombre = ?', [category]);
+    if (categoryResult.length === 0) {
+      return res.status(400).json({ message: 'Category not found' });
     }
-    const categoria_id = catResult[0].id;
+    const category_id = categoryResult[0].id;
 
-    // Obtener ID de la zona
-    let zona_id;
-    if (modalidad === 'virtual') {
-      const [zonaVirtual] = await pool.query('SELECT id FROM zonas WHERE nombre = "virtual"');
-      zona_id = zonaVirtual.length > 0 ? zonaVirtual[0].id : null;
+    let zone_id;
+    if (mode === 'virtual') {
+      const [virtualZone] = await pool.query('SELECT id FROM zonas WHERE nombre = "virtual"');
+      zone_id = virtualZone.length > 0 ? virtualZone[0].id : null;
     } else {
-      const [zonaResult] = await pool.query(
-        'SELECT id FROM zonas WHERE nombre = ?',
-        [zona]
-      );
-      if (zonaResult.length === 0) {
-        return res.status(400).json({ message: 'La zona no existe' });
+      const [zoneResult] = await pool.query('SELECT id FROM zonas WHERE nombre = ?', [zone]);
+      if (zoneResult.length === 0) {
+        return res.status(400).json({ message: 'Zone not found' });
       }
-      zona_id = zonaResult[0].id;
+      zone_id = zoneResult[0].id;
     }
 
-    const direccionFinal = modalidad === 'virtual' ? 'virtual' : direccion;
+    const finalAddress = mode === 'virtual' ? 'virtual' : address;
 
-    // Insertar servicio
-    const [resultado] = await pool.query(
+    const [result] = await pool.query(
       `INSERT INTO servicios 
        (entrenador_id, categoria_id, descripcion, duracion_minutos, cantidad_sesiones, precio, modalidad, zona_id, direccion, horario_inicio, horario_fin)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        entrenador_id,
-        categoria_id,
-        descripcion,
-        duracion_minutos,
-        cantidad_sesiones,
-        precio,
-        modalidad,
-        zona_id,
-        direccionFinal,
-        horario_inicio,
-        horario_fin
+        trainer_id,
+        category_id,
+        description,
+        duration_minutes,
+        session_count,
+        price,
+        mode,
+        zone_id,
+        finalAddress,
+        start_time,
+        end_time
       ]
     );
 
-    const servicio_id = resultado.insertId;
+    const service_id = result.insertId;
 
-    // Insertar días disponibles
-    const inserts = diasFiltrados.map((dia) =>
-      pool.query(
-        'INSERT INTO dias_servicio (servicio_id, dia) VALUES (?, ?)',
-        [servicio_id, dia]
-      )
+    const dayInserts = selectedDays.map((day) =>
+      pool.query('INSERT INTO dias_servicio (servicio_id, dia) VALUES (?, ?)', [service_id, day])
     );
-    await Promise.all(inserts);
+    await Promise.all(dayInserts);
 
-    // Subir imágenes (máximo 4)
-    const imagenes = req.files || [];
-    if (imagenes.length > 4) {
-      return res.status(400).json({ message: 'Solo se permiten hasta 4 imágenes por servicio' });
+    const images = req.files || [];
+    if (images.length > 4) {
+      return res.status(400).json({ message: 'You can only upload up to 4 images per service' });
     }
 
-    const imagenInserts = imagenes.map((img) =>
+    const imageInserts = images.map((img) =>
       pool.query(
         'INSERT INTO imagenes_servicio (servicio_id, nombre, ruta) VALUES (?, ?, ?)',
-        [servicio_id, img.originalname, `/uploads/service-images/${img.filename}`]
+        [service_id, img.originalname, `/uploads/service-images/${img.filename}`]
       )
     );
-    await Promise.all(imagenInserts);
+    await Promise.all(imageInserts);
 
-    res.status(201).json({ message: 'Servicio creado correctamente' });
+    res.status(201).json({ message: 'Service created successfully' });
   } catch (error) {
-    console.error('Error al crear servicio:', error);
-    res.status(500).json({ message: 'Error en el servidor' });
+    console.error('Error creating service:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

@@ -20,7 +20,7 @@ router.patch(
   '/:id',
   verificarToken,
   permitirRol('entrenador'),
-  uploadPerfil.single('foto_perfil'),
+  uploadPerfil.single('profile_picture'),
   trainersController.editarPerfilEntrenador
 );
 

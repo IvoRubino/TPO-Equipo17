@@ -164,7 +164,7 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
 //solo el entrenador puede editar su perfil, permitiendo cambiar la foto de perfil y la descripcion
 exports.editarPerfilEntrenador = async (req, res) => {
   const { id } = req.params;
-  const { descripcion } = req.body;
+  const { description } = req.body;
   const file = req.file;
 
   // Verificar si el usuario existe
@@ -184,7 +184,7 @@ exports.editarPerfilEntrenador = async (req, res) => {
   }
 
   // Verificar si se enviaron datos para actualizar
-  if (!descripcion && !file) {
+  if (!description && !file) {
     return res.status(400).json({ message: 'No fields provided for update' });
   }
 
@@ -193,9 +193,9 @@ exports.editarPerfilEntrenador = async (req, res) => {
     const values = [];
 
     // Actualizar descripción si se envió
-    if (descripcion) {
+    if (description) {
       fields.push('descripcion = ?');
-      values.push(descripcion);
+      values.push(description);
     }
 
     // Actualizar foto de perfil si se subió un archivo
@@ -282,17 +282,29 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
   const user = req.user;
 
   try {
-    // Verify that the user is the owner
+    // Verificar que el usuario autenticado es el dueño
     if (user.id !== trainerId || user.tipo !== 'entrenador') {
       return res.status(403).json({ message: 'You do not have permission to view these services' });
     }
 
     const [services] = await pool.query(
-      `SELECT id, categoria AS category, descripcion AS description, duracion_minutos AS duration_minutes,
-              cantidad_sesiones AS session_count, modalidad AS mode, zona AS zone, direccion AS address,
-              horario_inicio AS start_time, horario_fin AS end_time, precio AS price, estado AS status
-       FROM servicios
-       WHERE entrenador_id = ?`,
+      `SELECT 
+         s.id,
+         cat.nombre AS category,
+         s.descripcion AS description,
+         s.duracion_minutos AS duration_minutes,
+         s.cantidad_sesiones AS session_count,
+         s.modalidad AS mode,
+         z.nombre AS zone,
+         s.direccion AS address,
+         s.horario_inicio AS start_time,
+         s.horario_fin AS end_time,
+         s.precio AS price,
+         s.estado AS status
+       FROM servicios s
+       JOIN categorias cat ON s.categoria_id = cat.id
+       JOIN zonas z ON s.zona_id = z.id
+       WHERE s.entrenador_id = ?`,
       [trainerId]
     );
 

@@ -6,7 +6,9 @@ const { permitirRol } = require('../middleware/rolesMiddleware');
 const validarBodyNoVacio = require('../middleware/bodyNotEmptyMiddleware');
 const crearMulter = require('../utils/multer');
 
-const uploadImagenes = crearMulter('service-images');
+const uploadImagenes = crearMulter('service-images', {
+  extensiones: ['.jpg', '.jpeg', '.png', '.webp']
+});
 
 //Obtiene servicios por filtros
 router.get('/', servicesController.getServiciosConFiltros);
@@ -19,7 +21,7 @@ router.post(
   '/',
   verificarToken,
   permitirRol('entrenador'),
-  uploadImagenes.array('imagenes', 4),
+  uploadImagenes.array('images', 4),
   servicesController.crearServicio
 );
 

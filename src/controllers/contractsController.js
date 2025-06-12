@@ -1,5 +1,60 @@
 const pool = require('../config/db');
 
+exports.obtenerContrataciones = async (req, res) => {
+  const { id, tipo } = req.user;
+
+  try {
+    let query = '';
+    let params = [];
+
+    if (tipo === 'cliente') {
+      query = `
+        SELECT 
+          con.id AS contract_id,
+          s.id AS service_id,
+          s.descripcion AS service_name,
+          CONCAT(e.nombre, ' ', e.apellido) AS trainer,
+          con.estado AS state,
+          con.fecha_solicitud AS requested_at,
+          con.fecha_inicio AS start_date,
+          con.dia_semana AS weekday,
+          con.hora_inicio AS start_time
+        FROM contrataciones con
+        JOIN servicios s ON con.servicio_id = s.id
+        JOIN usuarios e ON s.entrenador_id = e.id
+        WHERE con.cliente_id = ?
+      `;
+      params = [id];
+    } else if (tipo === 'entrenador') {
+      query = `
+        SELECT 
+          con.id AS contract_id,
+          s.id AS service_id,
+          s.descripcion AS service_name,
+          CONCAT(c.nombre, ' ', c.apellido) AS client,
+          con.estado AS state,
+          con.fecha_solicitud AS requested_at,
+          con.fecha_inicio AS start_date,
+          con.dia_semana AS weekday,
+          con.hora_inicio AS start_time
+        FROM contrataciones con
+        JOIN servicios s ON con.servicio_id = s.id
+        JOIN usuarios c ON con.cliente_id = c.id
+        WHERE s.entrenador_id = ?
+      `;
+      params = [id];
+    } else {
+      return res.status(403).json({ message: 'Unauthorized user type' });
+    }
+
+    const [result] = await pool.query(query, params);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching contracts:', error);
+    res.status(500).json({ message: 'Server error while fetching contracts' });
+  }
+};
+
 exports.crearContrato = async (req, res) => {
   const { service_id } = req.body;
   const user = req.user;
