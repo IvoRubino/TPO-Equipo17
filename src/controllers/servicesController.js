@@ -35,7 +35,7 @@ exports.getServiciosConFiltros = async (req, res) => {
     }
 
     if (duration) {
-      filters.push('s.duracion_minutos = ?');
+      filters.push('s.duracion_minutos <= ?');
       values.push(duration);
     }
 

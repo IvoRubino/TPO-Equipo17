@@ -11,6 +11,8 @@ const authRoutes = require('./src/routes/auth');
 const trainersRoutes = require('./src/routes/trainers');
 const servicesRoutes = require('./src/routes/services');
 const contractRoutes = require('./src/routes/contracts');
+const zonesRoutes = require('./src/routes/zones');
+const categoriesRoutes = require('./src/routes/categories');
 
 // Tareas programadas
 require('./src/utils/cron');
@@ -50,6 +52,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/trainers', trainersRoutes);
 app.use('/api/v1/services', servicesRoutes);
 app.use('/api/v1/contracts', contractRoutes);
+app.use('/api/v1/zones', zonesRoutes);
+app.use('/api/v1/categories', categoriesRoutes);
 
 
 // Iniciar servidor
