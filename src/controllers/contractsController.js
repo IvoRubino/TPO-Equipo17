@@ -60,7 +60,7 @@ exports.crearContrato = async (req, res) => {
   const user = req.user;
 
   try {
-    if (user.type !== 'cliente') {
+    if (user.tipo !== 'cliente') {
       return res.status(403).json({ message: 'Only clients can hire services' });
     }
 
@@ -112,14 +112,14 @@ exports.actualizarContrato = async (req, res) => {
       }
 
       if (status === 'accepted') {
-        if (user.type !== 'trainer' || user.id !== contract.entrenador_id) {
+        if (user.tipo !== 'entrenador' || user.id !== contract.entrenador_id) {
           return res.status(403).json({ message: 'Only the trainer can accept this contract' });
         }
       }
 
       if (status === 'cancelled') {
-        const isClient = user.id === contract.cliente_id && user.type === 'client';
-        const isTrainer = user.id === contract.entrenador_id && user.type === 'trainer';
+        const isClient = user.id === contract.cliente_id && user.tipo === 'cliente';
+        const isTrainer = user.id === contract.entrenador_id && user.tipo === 'entrenador';
 
         if (!isClient && !isTrainer) {
           return res.status(403).json({ message: 'You do not have permission to cancel this contract' });
@@ -141,7 +141,7 @@ exports.actualizarContrato = async (req, res) => {
         });
       }
 
-      if (user.type !== 'client' || user.id !== contract.cliente_id) {
+      if (user.tipo !== 'cliente' || user.id !== contract.cliente_id) {
         return res.status(403).json({ message: 'Only the client can schedule the session' });
       }
 

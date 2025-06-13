@@ -10,7 +10,8 @@ exports.getServiciosConFiltros = async (req, res) => {
     mode,
     duration,
     zone,
-    limit
+    limit,
+    category
   } = req.query;
 
   try {
@@ -42,6 +43,11 @@ exports.getServiciosConFiltros = async (req, res) => {
     if (zone && mode !== 'virtual') {
       filters.push('z.nombre = ?');
       values.push(zone);
+    }
+
+    if (category) {
+      filters.push('cat.nombre = ?');
+      values.push(category);
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -87,7 +93,6 @@ exports.getServiciosConFiltros = async (req, res) => {
     res.status(500).json({ message: 'Error filtering services' });
   }
 };
-
 
 //obtiene datos relevantes del servicio por Id
 exports.obtenerServicioPorId = async (req, res) => {

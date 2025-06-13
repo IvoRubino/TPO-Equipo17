@@ -1,14 +1,9 @@
 const pool = require('../config/db');
 
-
-
-
 exports.obtenerPerfilEntrenador = async (req, res) => {
-  const trainerId = parseInt(req.params.id);
-  const user = req.user; // gracias al middleware verificarTokenOpcional
+  const trainerId = parseInt(req.params.id, 10);
 
   try {
-    // 1. Obtener datos básicos del entrenador
     const [trainers] = await pool.query(
       `SELECT id, nombre, apellido, descripcion, foto_perfil
        FROM usuarios
@@ -21,29 +16,37 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
     }
 
     const trainer = trainers[0];
-    const isOwner = user?.id === trainerId && user.tipo === 'entrenador';
 
-    // 2. Obtener servicios del entrenador
+    return res.json({
+      trainer: {
+        id: trainer.id,
+        first_name: trainer.nombre,
+        last_name: trainer.apellido,
+        description: trainer.descripcion,
+        profile_picture: trainer.foto_perfil
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener perfil del entrenador:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.obtenerReviewsEntrenador = async (req, res) => {
+  const trainerId = parseInt(req.params.id, 10);
+
+  try {
+    // Obtener los servicios del entrenador
     const [services] = await pool.query(
-      `SELECT s.id, c.nombre AS categoria, z.nombre AS zona,
-              s.descripcion, s.duracion_minutos, s.cantidad_sesiones,
-              s.modalidad, s.direccion, s.precio, s.estado,
-              s.horario_inicio, s.horario_fin
-       FROM servicios s
-       JOIN categorias c ON s.categoria_id = c.id
-       JOIN zonas z ON s.zona_id = z.id
-       WHERE s.entrenador_id = ?`,
+      `SELECT id FROM servicios WHERE entrenador_id = ?`,
       [trainerId]
     );
 
-    const filteredServices = isOwner
-      ? services
-      : services.filter(s => s.estado === 'publicado');
-
     const serviceIds = services.map(s => s.id);
-    const idsForStats = serviceIds.length ? [serviceIds] : [[-1]]; // evita error con IN () vacío
+    if (serviceIds.length === 0) {
+      return res.json({ reviews: [] });
+    }
 
-    // 3. Obtener reviews
     const [reviews] = await pool.query(
       `SELECT r.calificacion, r.comentario, r.fecha_comentario,
               u.nombre AS autor_nombre, u.apellido AS autor_apellido
@@ -51,10 +54,53 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
        JOIN contrataciones ct ON r.contratacion_id = ct.id
        JOIN usuarios u ON r.cliente_id = u.id
        WHERE ct.servicio_id IN (?)`,
-      idsForStats
+      [serviceIds]
     );
 
-    // 4. Promedio de calificaciones
+    return res.json({
+      reviews: reviews.map(r => ({
+        rating: r.calificacion,
+        comment: r.comentario,
+        date: r.fecha_comentario,
+        author_first_name: r.autor_nombre,
+        author_last_name: r.autor_apellido
+      }))
+    });
+  } catch (error) {
+    console.error('Error al obtener reviews del entrenador:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.obtenerEstadisticasEntrenador = async (req, res) => {
+  const trainerId = parseInt(req.params.id);
+  const user = req.user;
+
+  if (user.id !== trainerId || user.tipo !== 'entrenador') {
+    return res.status(403).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    // Obtener IDs de servicios del entrenador
+    const [services] = await pool.query(
+      'SELECT id FROM servicios WHERE entrenador_id = ?',
+      [trainerId]
+    );
+
+    const serviceIds = services.map(s => s.id);
+    if (serviceIds.length === 0) {
+      return res.json({
+        average_rating: null,
+        total_reviews: 0,
+        rating_distribution: {},
+        conversions: []
+      });
+    }
+
+    // Evitar error con IN ()
+    const idsForStats = [serviceIds];
+
+    // Calificación promedio
     const [avgResult] = await pool.query(
       `SELECT AVG(r.calificacion) AS promedio
        FROM comentarios r
@@ -63,100 +109,76 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
       idsForStats
     );
 
-    const averageRating = avgResult[0].promedio
+    const average_rating = avgResult[0].promedio
       ? parseFloat(avgResult[0].promedio).toFixed(2)
       : null;
 
-    // 5. Estadísticas privadas si es el dueño
-    let statistics = null;
+    // Cantidad total de reviews
+    const [totalReviewsResult] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM comentarios r
+       JOIN contrataciones ct ON r.contratacion_id = ct.id
+       WHERE ct.servicio_id IN (?)`,
+      idsForStats
+    );
 
-    if (isOwner && serviceIds.length > 0) {
-      const [views] = await pool.query(
-        `SELECT servicio_id, COUNT(*) AS visualizaciones
-         FROM visualizaciones
-         WHERE servicio_id IN (?)
-         GROUP BY servicio_id`,
-        [serviceIds]
-      );
+    const total_reviews = totalReviewsResult[0].total;
 
-      const [contracts] = await pool.query(
-        `SELECT servicio_id, COUNT(*) AS contrataciones
-         FROM contrataciones
-         WHERE estado = 'aceptado' AND servicio_id IN (?)
-         GROUP BY servicio_id`,
-        [serviceIds]
-      );
+    // Distribución de calificaciones
+    const [distribution] = await pool.query(
+      `SELECT r.calificacion, COUNT(*) AS cantidad
+       FROM comentarios r
+       JOIN contrataciones ct ON r.contratacion_id = ct.id
+       WHERE ct.servicio_id IN (?)
+       GROUP BY r.calificacion`,
+      idsForStats
+    );
 
-      const [distribution] = await pool.query(
-        `SELECT r.calificacion, COUNT(*) AS cantidad
-         FROM comentarios r
-         JOIN contrataciones ct ON r.contratacion_id = ct.id
-         WHERE ct.servicio_id IN (?)
-         GROUP BY r.calificacion`,
-        [serviceIds]
-      );
+    const rating_distribution = distribution.reduce((acc, row) => {
+      acc[row.calificacion] = row.cantidad;
+      return acc;
+    }, {});
 
-      const totalRatings = reviews.length;
+    // Visualizaciones
+    const [views] = await pool.query(
+      `SELECT servicio_id, COUNT(*) AS visualizaciones
+       FROM visualizaciones
+       WHERE servicio_id IN (?)
+       GROUP BY servicio_id`,
+      idsForStats
+    );
 
-      const conversions = services.map(service => {
-        const serviceViews = views.find(v => v.servicio_id === service.id)?.visualizaciones || 0;
-        const serviceContracts = contracts.find(c => c.servicio_id === service.id)?.contrataciones || 0;
-        const rate = serviceViews > 0 ? ((serviceContracts / serviceViews) * 100).toFixed(2) : '0.00';
+    // Contrataciones aceptadas
+    const [contracts] = await pool.query(
+      `SELECT servicio_id, COUNT(*) AS contrataciones
+       FROM contrataciones
+       WHERE estado = 'aceptado' AND servicio_id IN (?)
+       GROUP BY servicio_id`,
+      idsForStats
+    );
 
-        return {
-          service_id: service.id,
-          views: serviceViews,
-          contracts: serviceContracts,
-          conversion_rate: `${rate}%`
-        };
-      });
-
-      statistics = {
-        conversions,
-        average_rating: averageRating,
-        total_reviews: totalRatings,
-        rating_distribution: distribution.reduce((acc, curr) => {
-          acc[curr.calificacion] = curr.cantidad;
-          return acc;
-        }, {})
+    const conversions = serviceIds.map(id => {
+      const serviceViews = views.find(v => v.servicio_id === id)?.visualizaciones || 0;
+      const serviceContracts = contracts.find(c => c.servicio_id === id)?.contrataciones || 0;
+      const rate = serviceViews > 0
+        ? ((serviceContracts / serviceViews) * 100).toFixed(2)
+        : '0.00';
+      return {
+        service_id: id,
+        views: serviceViews,
+        contracts: serviceContracts,
+        conversion_rate: `${rate}%`
       };
-    }
+    });
 
-    // 6. Respuesta final
-    return res.json({
-      trainer: {
-        id: trainer.id,
-        first_name: trainer.nombre,
-        last_name: trainer.apellido,
-        description: trainer.descripcion,
-        profile_picture: trainer.foto_perfil
-      },
-      services: filteredServices.map(s => ({
-        id: s.id,
-        category: s.categoria,
-        area: s.zona,
-        description: s.descripcion,
-        duration_minutes: s.duracion_minutos,
-        session_count: s.cantidad_sesiones,
-        modality: s.modalidad,
-        address: s.direccion,
-        price: s.precio,
-        status: s.estado,
-        start_time: s.horario_inicio,
-        end_time: s.horario_fin
-      })),
-      reviews: reviews.map(r => ({
-        rating: r.calificacion,
-        comment: r.comentario,
-        date: r.fecha_comentario,
-        author_first_name: r.autor_nombre,
-        author_last_name: r.autor_apellido
-      })),
-      average_rating: averageRating,
-      ...(statistics && { statistics })
+    res.json({
+      average_rating,
+      total_reviews,
+      rating_distribution,
+      conversions
     });
   } catch (error) {
-    console.error('Error al obtener perfil del entrenador:', error);
+    console.error('Error al obtener estadísticas del entrenador:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

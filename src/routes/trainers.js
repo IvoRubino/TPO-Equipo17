@@ -4,17 +4,23 @@ const trainersController = require('../controllers/trainersController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const { permitirRol } = require('../middleware/rolesMiddleware');
 const validarBodyNoVacio = require('../middleware/bodyNotEmptyMiddleware');
-const { verificarTokenOpcional } = require('../middleware/optionalTokenMiddleware');
 const crearMulter = require('../utils/multer');
 
 const uploadPerfil = crearMulter('profile-pictures', {
   extensiones: ['.jpg', '.jpeg', '.png']
 });
 
-// Perfil público del entrenador (servicios, reviews, promedio, etc.)
+// GET a perfil del entrenador
 router.get('/:id', 
-  verificarTokenOpcional, 
   trainersController.obtenerPerfilEntrenador);
+
+router.get('/:id/reviews', 
+  trainersController.obtenerReviewsEntrenador);
+
+router.get(
+  '/:id/statistics', 
+  verificarToken,
+  trainersController.obtenerEstadisticasEntrenador);
 
 router.patch(
   '/:id',
