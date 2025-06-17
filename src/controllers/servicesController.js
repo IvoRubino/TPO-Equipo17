@@ -54,7 +54,7 @@ exports.getServiciosConFiltros = async (req, res) => {
 
     const sql = `
       SELECT 
-        s.id, s.descripcion AS description, s.precio AS price, 
+        s.id, s.nombre AS name, s.descripcion AS description, s.precio AS price, 
         s.duracion_minutos AS duration_minutes, s.cantidad_sesiones AS session_count,
         s.modalidad AS mode, s.horario_inicio AS start_time, s.horario_fin AS end_time,
         z.nombre AS zone,
@@ -101,7 +101,7 @@ exports.obtenerServicioPorId = async (req, res) => {
   try {
     // 1. Get service data
     const [result] = await pool.query(
-      `SELECT s.id, s.descripcion, s.modalidad, s.direccion, s.precio,
+      `SELECT s.id, s.nombre AS name, s.descripcion, s.modalidad, s.direccion, s.precio,
               s.horario_inicio, s.horario_fin, s.duracion_minutos, s.cantidad_sesiones,
               c.nombre AS categoria, z.nombre AS zona,
               u.id AS entrenador_id, u.nombre AS entrenador_nombre, u.apellido AS entrenador_apellido, u.foto_perfil
@@ -151,6 +151,7 @@ exports.obtenerServicioPorId = async (req, res) => {
     // 6. Enviar respuesta
     res.json({
       id: servicio.id,
+      name: servicio.name,
       description: servicio.descripcion,
       category: servicio.categoria,
       zone: servicio.zona,
@@ -182,6 +183,7 @@ exports.obtenerServicioPorId = async (req, res) => {
 exports.crearServicio = async (req, res) => {
   const trainer_id = req.user.id;
   const {
+    name,
     category,
     description,
     duration_minutes,
@@ -195,7 +197,7 @@ exports.crearServicio = async (req, res) => {
     end_time
   } = req.body;
 
-  if (!category || !description || !duration_minutes || !session_count || !price || !mode || !days) {
+  if (!name || !category || !description || !duration_minutes || !session_count || !price || !mode || !days) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -250,11 +252,12 @@ exports.crearServicio = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO servicios 
-       (entrenador_id, categoria_id, descripcion, duracion_minutos, cantidad_sesiones, precio, modalidad, zona_id, direccion, horario_inicio, horario_fin)
+       (entrenador_id, categoria_id, nombre, descripcion, duracion_minutos, cantidad_sesiones, precio, modalidad, zona_id, direccion, horario_inicio, horario_fin)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         trainer_id,
         category_id,
+        name,
         description,
         duration_minutes,
         session_count,
@@ -297,7 +300,9 @@ exports.crearServicio = async (req, res) => {
 //actualiza servicio (es un PUT)
 exports.actualizarServicio = async (req, res) => {
   const trainer_id = req.user.id;
+  const service_id = req.params.id;
   const {
+    name,
     category,
     description,
     duration_minutes,
@@ -311,8 +316,8 @@ exports.actualizarServicio = async (req, res) => {
     end_time
   } = req.body;
 
-  // Basic validation
-  if (!category || !description || !duration_minutes || !session_count || !price || !modality || !days) {
+  // Validaciones básicas
+  if (!name || !category || !description || !duration_minutes || !session_count || !price || !modality || !days) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -324,7 +329,6 @@ exports.actualizarServicio = async (req, res) => {
     return res.status(400).json({ message: 'Zone and address are required for in-person modality' });
   }
 
-  // Time validation
   if (!start_time || !end_time) {
     return res.status(400).json({ message: 'Start and end times are required' });
   }
@@ -338,37 +342,37 @@ exports.actualizarServicio = async (req, res) => {
     return res.status(400).json({ message: 'Start time must be before end time' });
   }
 
-  // Day validation
   const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  const filteredDays = Array.isArray(days)
-    ? days.filter((d) => validDays.includes(d))
-    : [];
+  const filteredDays = Array.isArray(days) ? days.filter((d) => validDays.includes(d)) : [];
 
   if (filteredDays.length === 0) {
     return res.status(400).json({ message: 'You must select at least one valid day' });
   }
 
   try {
-    // Get category ID
-    const [catResult] = await pool.query(
-      'SELECT id FROM categories WHERE name = ?',
-      [category]
+    // Verificamos que el servicio exista y sea del entrenador
+    const [existingService] = await pool.query(
+      'SELECT * FROM services WHERE id = ? AND trainer_id = ?',
+      [service_id, trainer_id]
     );
+    if (existingService.length === 0) {
+      return res.status(404).json({ message: 'Service not found or unauthorized' });
+    }
+
+    // Obtener ID de categoría
+    const [catResult] = await pool.query('SELECT id FROM categories WHERE name = ?', [category]);
     if (catResult.length === 0) {
       return res.status(400).json({ message: 'Category does not exist' });
     }
     const category_id = catResult[0].id;
 
-    // Get zone ID
+    // Obtener zona
     let zone_id;
     if (modality === 'virtual') {
       const [virtualZone] = await pool.query('SELECT id FROM zones WHERE name = "virtual"');
       zone_id = virtualZone.length > 0 ? virtualZone[0].id : null;
     } else {
-      const [zoneResult] = await pool.query(
-        'SELECT id FROM zones WHERE name = ?',
-        [zone]
-      );
+      const [zoneResult] = await pool.query('SELECT id FROM zones WHERE name = ?', [zone]);
       if (zoneResult.length === 0) {
         return res.status(400).json({ message: 'Zone does not exist' });
       }
@@ -377,13 +381,15 @@ exports.actualizarServicio = async (req, res) => {
 
     const finalAddress = modality === 'virtual' ? 'virtual' : address;
 
-    // Insert service
-    const [result] = await pool.query(
-      `INSERT INTO services 
-       (trainer_id, category_id, description, duration_minutes, session_count, price, modality, zone_id, address, start_time, end_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    // Actualizar el servicio
+    await pool.query(
+      `UPDATE services SET 
+        name = ?, category_id = ?, description = ?, duration_minutes = ?, 
+        session_count = ?, price = ?, modality = ?, zone_id = ?, 
+        address = ?, start_time = ?, end_time = ?
+       WHERE id = ? AND trainer_id = ?`,
       [
-        trainer_id,
+        name,
         category_id,
         description,
         duration_minutes,
@@ -393,38 +399,40 @@ exports.actualizarServicio = async (req, res) => {
         zone_id,
         finalAddress,
         start_time,
-        end_time
+        end_time,
+        service_id,
+        trainer_id
       ]
     );
 
-    const service_id = result.insertId;
-
-    // Insert available days
+    // Borrar y volver a insertar los días
+    await pool.query('DELETE FROM service_days WHERE service_id = ?', [service_id]);
     const dayInserts = filteredDays.map((day) =>
-      pool.query(
-        'INSERT INTO service_days (service_id, day) VALUES (?, ?)',
-        [service_id, day]
-      )
+      pool.query('INSERT INTO service_days (service_id, day) VALUES (?, ?)', [service_id, day])
     );
     await Promise.all(dayInserts);
 
-    // Upload images (max 4)
+    // Si se mandan nuevas imágenes, borrar las viejas y subir nuevas
     const images = req.files || [];
-    if (images.length > 4) {
-      return res.status(400).json({ message: 'Only up to 4 images per service are allowed' });
+    if (images.length > 0) {
+      if (images.length > 4) {
+        return res.status(400).json({ message: 'Only up to 4 images per service are allowed' });
+      }
+
+      await pool.query('DELETE FROM service_images WHERE service_id = ?', [service_id]);
+
+      const imageInserts = images.map((img) =>
+        pool.query(
+          'INSERT INTO service_images (service_id, name, path) VALUES (?, ?, ?)',
+          [service_id, img.originalname, `/uploads/service-images/${img.filename}`]
+        )
+      );
+      await Promise.all(imageInserts);
     }
 
-    const imageInserts = images.map((img) =>
-      pool.query(
-        'INSERT INTO service_images (service_id, name, path) VALUES (?, ?, ?)',
-        [service_id, img.originalname, `/uploads/service-images/${img.filename}`]
-      )
-    );
-    await Promise.all(imageInserts);
-
-    res.status(201).json({ message: 'Service created successfully' });
+    res.status(200).json({ message: 'Service updated successfully' });
   } catch (error) {
-    console.error('Error creating service:', error);
+    console.error('Error updating service:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
