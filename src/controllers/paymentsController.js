@@ -55,7 +55,8 @@ exports.webhookStripe = async (req, res) => {
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    // ✅ Usá req.body, no req.rawBody
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -67,7 +68,6 @@ exports.webhookStripe = async (req, res) => {
     const servicio_id = session.metadata.servicio_id;
 
     try {
-      // Verificar si ya existe una contratación idéntica pendiente
       const [exist] = await pool.query(
         'SELECT * FROM contrataciones WHERE cliente_id = ? AND servicio_id = ? AND estado = "pendiente"',
         [cliente_id, servicio_id]
