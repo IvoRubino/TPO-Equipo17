@@ -107,17 +107,17 @@ exports.actualizarContrato = async (req, res) => {
     const contract = contracts[0];
 
     if (status) {
-      if (!['accepted', 'cancelled', 'completed'].includes(status)) {
+      if (!['aceptado', 'cancelado', 'completado'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
       }
 
-      if (status === 'accepted') {
+      if (status === 'aceptado') {
         if (user.tipo !== 'entrenador' || user.id !== contract.entrenador_id) {
           return res.status(403).json({ message: 'Only the trainer can accept this contract' });
         }
       }
 
-      if (status === 'cancelled') {
+      if (status === 'cancelado') {
         const isClient = user.id === contract.cliente_id && user.tipo === 'cliente';
         const isTrainer = user.id === contract.entrenador_id && user.tipo === 'entrenador';
 
