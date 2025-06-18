@@ -6,6 +6,16 @@ exports.createCheckoutSession = async (req, res) => {
   const user = req.user; // Cliente autenticado
 
   try {
+    // Verificar si ya contrató este servicio
+    const [existing] = await pool.query(`
+      SELECT * FROM contrataciones
+      WHERE cliente_id = ? AND servicio_id = ? AND estado IN ('pendiente', 'aceptado')
+    `, [user.id, servicio_id]);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Ya contrataste este servicio' });
+    }
+
     // Obtener datos del servicio
     const [rows] = await pool.query(`
       SELECT s.id, s.precio, s.descripcion, u.id AS entrenador_id
@@ -35,8 +45,8 @@ exports.createCheckoutSession = async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: 'http://localhost:5173/payment-success',
-      cancel_url: 'http://localhost:5173/payment-cancel',
+      success_url: 'http://localhost:5173/pago/exito',
+      cancel_url: 'http://localhost:5173/pago/cancelado',
       metadata: {
         cliente_id: user.id,
         servicio_id: servicio.id,
