@@ -12,7 +12,7 @@ exports.obtenerContrataciones = async (req, res) => {
         SELECT 
           con.id AS contract_id,
           s.id AS service_id,
-          s.descripcion AS service_name,
+          s.nombre AS service_name,
           CONCAT(e.nombre, ' ', e.apellido) AS trainer,
           con.estado AS state,
           con.fecha_solicitud AS requested_at,
@@ -30,7 +30,7 @@ exports.obtenerContrataciones = async (req, res) => {
         SELECT 
           con.id AS contract_id,
           s.id AS service_id,
-          s.descripcion AS service_name,
+          s.nombre AS service_name,
           CONCAT(c.nombre, ' ', c.apellido) AS client,
           con.estado AS state,
           con.fecha_solicitud AS requested_at,

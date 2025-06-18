@@ -149,13 +149,13 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
     );
 
     // Contrataciones aceptadas
-    const [contracts] = await pool.query(
-      `SELECT servicio_id, COUNT(*) AS contrataciones
-       FROM contrataciones
-       WHERE estado = 'aceptado' AND servicio_id IN (?)
-       GROUP BY servicio_id`,
-      idsForStats
-    );
+   const [contracts] = await pool.query(
+    `SELECT servicio_id, COUNT(*) AS contrataciones
+     FROM contrataciones
+     WHERE estado IN ('aceptado', 'completado') AND servicio_id IN (?)
+     GROUP BY servicio_id`,
+    [idsForStats]
+);
 
     const conversions = serviceIds.map(id => {
       const serviceViews = views.find(v => v.servicio_id === id)?.visualizaciones || 0;
