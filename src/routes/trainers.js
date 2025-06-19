@@ -4,6 +4,7 @@ const trainersController = require('../controllers/trainersController');
 const { verificarToken } = require('../middleware/authMiddleware');
 const { permitirRol } = require('../middleware/rolesMiddleware');
 const validarBodyNoVacio = require('../middleware/bodyNotEmptyMiddleware');
+const { verificarTokenOpcional } = require('../middleware/optionalTokenMiddleware');
 const crearMulter = require('../utils/multer');
 
 const uploadPerfil = crearMulter('profile-pictures', {
@@ -41,7 +42,7 @@ router.post(
 //GET de todos los servicios de un entrenador
 router.get(
   '/:id/services', 
-  verificarToken,
+  verificarTokenOpcional,
   permitirRol('entrenador'),
   trainersController.obtenerServiciosDelEntrenador);
 

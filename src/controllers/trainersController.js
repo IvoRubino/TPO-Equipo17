@@ -81,9 +81,9 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
   }
 
   try {
-    // Obtener IDs de servicios del entrenador
+    // Obtener IDs y nombres de servicios del entrenador
     const [services] = await pool.query(
-      'SELECT id FROM servicios WHERE entrenador_id = ?',
+      'SELECT id, descripcion AS name FROM servicios WHERE entrenador_id = ?',
       [trainerId]
     );
 
@@ -109,7 +109,7 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
     );
 
     const average_rating = avgResult[0].promedio
-      ? parseFloat(avgResult[0].promedio).toFixed(2)
+      ? parseFloat(avgResult[0].promedio)
       : null;
 
     // Cantidad total de reviews
@@ -157,17 +157,21 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       serviceIds
     );
 
+    // Armar lista de conversiones
     const conversions = serviceIds.map(id => {
       const serviceViews = views.find(v => v.servicio_id === id)?.visualizaciones || 0;
       const serviceContracts = contracts.find(c => c.servicio_id === id)?.contrataciones || 0;
       const rate = serviceViews > 0
-        ? ((serviceContracts / serviceViews) * 100).toFixed(2)
-        : '0.00';
+        ? Number(((serviceContracts / serviceViews) * 100).toFixed(2))
+        : 0;
+      const name = services.find(s => s.id === id)?.name || 'Unnamed Service';
+
       return {
         service_id: id,
+        name,
         views: serviceViews,
         contracts: serviceContracts,
-        conversion_rate: `${rate}%`
+        conversion_rate: rate
       };
     });
 
@@ -301,35 +305,40 @@ exports.comentarEntrenador = async (req, res) => {
 
 exports.obtenerServiciosDelEntrenador = async (req, res) => {
   const trainerId = parseInt(req.params.id);
-  const user = req.user;
+  const user = req.user; // gracias a verificarTokenOpcional
 
   try {
-    // Verificar que el usuario autenticado es el dueño
-    if (user.id !== trainerId || user.tipo !== 'entrenador') {
-      return res.status(403).json({ message: 'You do not have permission to view these services' });
+    // Si está autenticado y es el mismo entrenador → mostrar todo
+    const isOwner = user && user.id === trainerId && user.tipo === 'entrenador';
+
+    let query = `
+      SELECT 
+        s.id,
+        cat.nombre AS category,
+        s.descripcion AS description,
+        s.duracion_minutos AS duration_minutes,
+        s.cantidad_sesiones AS session_count,
+        s.modalidad AS mode,
+        z.nombre AS zone,
+        s.direccion AS address,
+        s.horario_inicio AS start_time,
+        s.horario_fin AS end_time,
+        s.precio AS price,
+        s.estado AS status
+      FROM servicios s
+      JOIN categorias cat ON s.categoria_id = cat.id
+      JOIN zonas z ON s.zona_id = z.id
+      WHERE s.entrenador_id = ?
+    `;
+
+    const params = [trainerId];
+
+    // Si no es el dueño, filtrar solo servicios publicados
+    if (!isOwner) {
+      query += ` AND s.estado = 'publicado'`;
     }
 
-    const [services] = await pool.query(
-      `SELECT 
-         s.id,
-         cat.nombre AS category,
-         s.descripcion AS description,
-         s.duracion_minutos AS duration_minutes,
-         s.cantidad_sesiones AS session_count,
-         s.modalidad AS mode,
-         z.nombre AS zone,
-         s.direccion AS address,
-         s.horario_inicio AS start_time,
-         s.horario_fin AS end_time,
-         s.precio AS price,
-         s.estado AS status
-       FROM servicios s
-       JOIN categorias cat ON s.categoria_id = cat.id
-       JOIN zonas z ON s.zona_id = z.id
-       WHERE s.entrenador_id = ?`,
-      [trainerId]
-    );
-
+    const [services] = await pool.query(query, params);
     res.json(services);
   } catch (error) {
     console.error('Error getting trainer services:', error);
