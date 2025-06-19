@@ -97,16 +97,15 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       });
     }
 
-    // Evitar error con IN ()
-    const idsForStats = [serviceIds];
+    const placeholders = serviceIds.map(() => '?').join(', ');
 
     // Calificación promedio
     const [avgResult] = await pool.query(
       `SELECT AVG(r.calificacion) AS promedio
        FROM comentarios r
        JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (?)`,
-      idsForStats
+       WHERE ct.servicio_id IN (${placeholders})`,
+      serviceIds
     );
 
     const average_rating = avgResult[0].promedio
@@ -118,8 +117,8 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       `SELECT COUNT(*) AS total
        FROM comentarios r
        JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (?)`,
-      idsForStats
+       WHERE ct.servicio_id IN (${placeholders})`,
+      serviceIds
     );
 
     const total_reviews = totalReviewsResult[0].total;
@@ -129,9 +128,9 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       `SELECT r.calificacion, COUNT(*) AS cantidad
        FROM comentarios r
        JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (?)
+       WHERE ct.servicio_id IN (${placeholders})
        GROUP BY r.calificacion`,
-      idsForStats
+      serviceIds
     );
 
     const rating_distribution = distribution.reduce((acc, row) => {
@@ -143,19 +142,20 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
     const [views] = await pool.query(
       `SELECT servicio_id, COUNT(*) AS visualizaciones
        FROM visualizaciones
-       WHERE servicio_id IN (?)
+       WHERE servicio_id IN (${placeholders})
        GROUP BY servicio_id`,
-      idsForStats
+      serviceIds
     );
 
     // Contrataciones aceptadas
-   const [contracts] = await pool.query(
-    `SELECT servicio_id, COUNT(*) AS contrataciones
-     FROM contrataciones
-     WHERE estado IN ('aceptado', 'completado') AND servicio_id IN (?)
-     GROUP BY servicio_id`,
-    [idsForStats]
-);
+    const [contracts] = await pool.query(
+      `SELECT servicio_id, COUNT(*) AS contrataciones
+       FROM contrataciones
+       WHERE estado IN ('aceptado', 'completado')
+         AND servicio_id IN (${placeholders})
+       GROUP BY servicio_id`,
+      serviceIds
+    );
 
     const conversions = serviceIds.map(id => {
       const serviceViews = views.find(v => v.servicio_id === id)?.visualizaciones || 0;
