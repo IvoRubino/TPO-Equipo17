@@ -83,7 +83,7 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
   try {
     // Obtener IDs y nombres de servicios del entrenador
     const [services] = await pool.query(
-      'SELECT id, descripcion AS name FROM servicios WHERE entrenador_id = ?',
+      'SELECT id, nombre AS name FROM servicios WHERE entrenador_id = ?',
       [trainerId]
     );
 
