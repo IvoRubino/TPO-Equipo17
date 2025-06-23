@@ -1,0 +1,3 @@
+todo index.js hace esto app.use('/api/v1/users', userRoutes);
+
+deberia hacer a /users nada mas

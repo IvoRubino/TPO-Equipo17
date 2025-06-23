@@ -14,6 +14,7 @@ const contractRoutes = require('./src/routes/contracts');
 const zonesRoutes = require('./src/routes/zones');
 const categoriesRoutes = require('./src/routes/categories');
 const paymentsRoutes = require('./src/routes/payments');
+const reviewsRoutes = require('./src/routes/reviews');
 
 // Tareas programadas
 require('./src/utils/cron');
@@ -58,6 +59,7 @@ app.use('/api/v1/contracts', contractRoutes);
 app.use('/api/v1/zones', zonesRoutes);
 app.use('/api/v1/categories', categoriesRoutes);
 app.use('/api/v1/payments', paymentsRoutes);
+app.use('/api/v1/reviews', reviewsRoutes);
 
 
 // Iniciar servidor
