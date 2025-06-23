@@ -10,7 +10,7 @@ exports.obtenerMejoresComentarios = async (req, res) => {
          u.nombre AS first_name,
          u.apellido AS last_name,
          c.calificacion AS rating,
-         c.comentario AS comment,
+         c.comentario AS comment
        FROM comentarios c
        JOIN usuarios u ON c.cliente_id = u.id
        ORDER BY c.calificacion DESC, c.fecha_comentario DESC
