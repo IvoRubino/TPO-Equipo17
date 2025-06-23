@@ -273,7 +273,7 @@ exports.comentarEntrenador = async (req, res) => {
       `SELECT c.*
        FROM contrataciones c
        JOIN servicios s ON c.servicio_id = s.id
-       WHERE c.cliente_id = ? AND s.entrenador_id = ? AND c.estado = 'aceptada'`,
+       WHERE c.cliente_id = ? AND s.entrenador_id = ? AND c.estado != 'pendiente'`,
       [clientId, trainerId]
     );
     if (contract.length === 0) {
