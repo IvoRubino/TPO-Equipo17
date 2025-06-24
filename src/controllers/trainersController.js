@@ -243,61 +243,57 @@ exports.editarPerfilEntrenador = async (req, res) => {
 
 //cliente comenta a entrenador
 exports.comentarEntrenador = async (req, res) => {
-  const trainerId = parseInt(req.params.id);
+  const trainerId = parseInt(req.params.id, 10);
   const clientId = req.user.id;
-  const { comentario, calificacion } = req.body;
+  const { comment, rating } = req.body;
 
-  // Validar los datos recibidos
-  if (!Number.isInteger(trainerId) || !calificacion) {
-    return res.status(400).json({ message: 'Invalid data' });
-  }
-
-  if (calificacion < 1 || calificacion > 5) {
-    return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+  // Basic validation
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Rating must be a number between 1 and 5' });
   }
 
   try {
-    // Verificar que el entrenador exista
-    const [trainer] = await pool.query(
+    // 1. Check if the trainer exists and is of type "entrenador"
+    const [trainerRows] = await pool.query(
       'SELECT * FROM usuarios WHERE id = ? AND tipo = "entrenador"',
       [trainerId]
     );
-    if (trainer.length === 0) {
+    if (trainerRows.length === 0) {
       return res.status(404).json({ message: 'Trainer not found' });
     }
 
-    // Verificar que haya una contratacion aceptada con un servicio del entrenador
-    const [contract] = await pool.query(
-      `SELECT c.*
+    // 2. Check if the client has at least one valid contract with that trainer
+    const [contracts] = await pool.query(
+      `SELECT c.id
        FROM contrataciones c
        JOIN servicios s ON c.servicio_id = s.id
        WHERE c.cliente_id = ? AND s.entrenador_id = ? AND c.estado != 'pendiente'`,
       [clientId, trainerId]
     );
-    if (contract.length === 0) {
+    if (contracts.length === 0) {
       return res.status(403).json({ message: 'You can only leave a review if you have hired this trainer' });
     }
 
-    // Verificar si ya dejo una review
+    // 3. Check if the client already left a review for this trainer
     const [existing] = await pool.query(
-      'SELECT * FROM comentarios WHERE cliente_id = ? AND entrenador_id = ?',
+      `SELECT * FROM comentarios WHERE cliente_id = ? AND entrenador_id = ?`,
       [clientId, trainerId]
     );
     if (existing.length > 0) {
       return res.status(400).json({ message: 'You have already left a review for this trainer' });
     }
 
-    // Insertar la review
+    // 4. Insert review
     await pool.query(
-      `INSERT INTO comentarios (cliente_id, entrenador_id, comentario, calificacion, fecha)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [clientId, trainerId, comentario || '', calificacion]
+      `INSERT INTO comentarios (cliente_id, entrenador_id, comentario, calificacion)
+       VALUES (?, ?, ?, ?)`,
+      [clientId, trainerId, comment || '', rating]
     );
 
-    res.status(201).json({ message: 'Review submitted successfully' });
+    return res.status(201).json({ message: 'Review submitted successfully' });
   } catch (error) {
-    console.error('Error reviewing trainer:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error submitting review:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
