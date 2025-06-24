@@ -43,7 +43,6 @@ router.post(
 router.get(
   '/:id/services', 
   verificarTokenOpcional,
-  permitirRol('entrenador'),
   trainersController.obtenerServiciosDelEntrenador);
 
 module.exports = router;
