@@ -36,34 +36,40 @@ exports.obtenerReviewsEntrenador = async (req, res) => {
   const trainerId = parseInt(req.params.id, 10);
 
   try {
-    // Obtener los servicios del entrenador
-    const [services] = await pool.query(
-      `SELECT id FROM servicios WHERE entrenador_id = ?`,
+    // Verificar que el entrenador exista
+    const [entrenador] = await pool.query(
+      `SELECT * FROM usuarios WHERE id = ? AND tipo = 'entrenador'`,
       [trainerId]
     );
 
-    const serviceIds = services.map(s => s.id);
-    if (serviceIds.length === 0) {
-      return res.json({ reviews: [] });
+    if (entrenador.length === 0) {
+      return res.status(404).json({ message: 'Trainer not found' });
     }
 
     const [reviews] = await pool.query(
-      `SELECT r.calificacion, r.comentario, r.fecha_comentario,
-              u.nombre AS autor_nombre, u.apellido AS autor_apellido
-       FROM comentarios r
-       JOIN contrataciones ct ON r.contratacion_id = ct.id
-       JOIN usuarios u ON r.cliente_id = u.id
-       WHERE ct.servicio_id IN (?)`,
-      [serviceIds]
+      `SELECT 
+         c.calificacion, 
+         c.comentario, 
+         c.fecha_comentario,
+         u.id AS user_id,
+         u.nombre AS autor_nombre, 
+         u.apellido AS autor_apellido, 
+         u.foto_perfil AS profile_picture
+       FROM comentarios c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.entrenador_id = ?`,
+      [trainerId]
     );
 
     return res.json({
       reviews: reviews.map(r => ({
+        user_id: r.user_id,
         rating: r.calificacion,
         comment: r.comentario,
         date: r.fecha_comentario,
         author_first_name: r.autor_nombre,
-        author_last_name: r.autor_apellido
+        author_last_name: r.autor_apellido,
+        profile_picture: r.profile_picture
       }))
     });
   } catch (error) {
@@ -71,7 +77,6 @@ exports.obtenerReviewsEntrenador = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 exports.obtenerEstadisticasEntrenador = async (req, res) => {
   const trainerId = parseInt(req.params.id);
   const user = req.user;
