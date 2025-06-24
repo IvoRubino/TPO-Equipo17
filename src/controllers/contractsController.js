@@ -13,6 +13,7 @@ exports.obtenerContrataciones = async (req, res) => {
           con.id AS contract_id,
           s.id AS service_id,
           s.nombre AS service_name,
+          s.entrenador_id AS trainer_id,
           CONCAT(e.nombre, ' ', e.apellido) AS trainer,
           con.estado AS state,
           con.fecha_solicitud AS requested_at,
@@ -31,6 +32,7 @@ exports.obtenerContrataciones = async (req, res) => {
           con.id AS contract_id,
           s.id AS service_id,
           s.nombre AS service_name,
+          con.cliente_id AS client_id,
           CONCAT(c.nombre, ' ', c.apellido) AS client,
           con.estado AS state,
           con.fecha_solicitud AS requested_at,
@@ -54,6 +56,7 @@ exports.obtenerContrataciones = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching contracts' });
   }
 };
+
 
 exports.crearContrato = async (req, res) => {
   const { service_id } = req.body;
