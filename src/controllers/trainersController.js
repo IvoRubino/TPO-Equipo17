@@ -81,56 +81,44 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
   }
 
   try {
-    // Obtener IDs y nombres de servicios del entrenador
+    // 1. Obtener IDs y nombres de servicios del entrenador
     const [services] = await pool.query(
       'SELECT id, nombre AS name FROM servicios WHERE entrenador_id = ?',
       [trainerId]
     );
 
     const serviceIds = services.map(s => s.id);
-    if (serviceIds.length === 0) {
-      return res.json({
-        average_rating: null,
-        total_reviews: 0,
-        rating_distribution: {},
-        conversions: []
-      });
-    }
-
     const placeholders = serviceIds.map(() => '?').join(', ');
 
-    // Calificación promedio
+    // 2. Calificación promedio
     const [avgResult] = await pool.query(
-      `SELECT AVG(r.calificacion) AS promedio
-       FROM comentarios r
-       JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (${placeholders})`,
-      serviceIds
+      `SELECT AVG(calificacion) AS promedio
+       FROM comentarios
+       WHERE entrenador_id = ?`,
+      [trainerId]
     );
 
     const average_rating = avgResult[0].promedio
       ? parseFloat(avgResult[0].promedio)
       : null;
 
-    // Cantidad total de reviews
+    // 3. Total de reviews
     const [totalReviewsResult] = await pool.query(
       `SELECT COUNT(*) AS total
-       FROM comentarios r
-       JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (${placeholders})`,
-      serviceIds
+       FROM comentarios
+       WHERE entrenador_id = ?`,
+      [trainerId]
     );
 
     const total_reviews = totalReviewsResult[0].total;
 
-    // Distribución de calificaciones
+    // 4. Distribución de calificaciones
     const [distribution] = await pool.query(
-      `SELECT r.calificacion, COUNT(*) AS cantidad
-       FROM comentarios r
-       JOIN contrataciones ct ON r.contratacion_id = ct.id
-       WHERE ct.servicio_id IN (${placeholders})
-       GROUP BY r.calificacion`,
-      serviceIds
+      `SELECT calificacion, COUNT(*) AS cantidad
+       FROM comentarios
+       WHERE entrenador_id = ?
+       GROUP BY calificacion`,
+      [trainerId]
     );
 
     const rating_distribution = distribution.reduce((acc, row) => {
@@ -138,26 +126,30 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       return acc;
     }, {});
 
-    // Visualizaciones
-    const [views] = await pool.query(
-      `SELECT servicio_id, COUNT(*) AS visualizaciones
-       FROM visualizaciones
-       WHERE servicio_id IN (${placeholders})
-       GROUP BY servicio_id`,
-      serviceIds
-    );
+    // 5. Visualizaciones por servicio
+    const [views] = serviceIds.length > 0
+      ? await pool.query(
+          `SELECT servicio_id, COUNT(*) AS visualizaciones
+           FROM visualizaciones
+           WHERE servicio_id IN (${placeholders})
+           GROUP BY servicio_id`,
+          serviceIds
+        )
+      : [[]];
 
-    // Contrataciones aceptadas
-    const [contracts] = await pool.query(
-      `SELECT servicio_id, COUNT(*) AS contrataciones
-       FROM contrataciones
-       WHERE estado IN ('aceptado', 'completado')
-         AND servicio_id IN (${placeholders})
-       GROUP BY servicio_id`,
-      serviceIds
-    );
+    // 6. Contrataciones aceptadas por servicio
+    const [contracts] = serviceIds.length > 0
+      ? await pool.query(
+          `SELECT servicio_id, COUNT(*) AS contrataciones
+           FROM contrataciones
+           WHERE estado IN ('aceptado', 'completado')
+             AND servicio_id IN (${placeholders})
+           GROUP BY servicio_id`,
+          serviceIds
+        )
+      : [[]];
 
-    // Armar lista de conversiones
+    // 7. Calcular conversiones por servicio
     const conversions = serviceIds.map(id => {
       const serviceViews = views.find(v => v.servicio_id === id)?.visualizaciones || 0;
       const serviceContracts = contracts.find(c => c.servicio_id === id)?.contrataciones || 0;
@@ -175,6 +167,7 @@ exports.obtenerEstadisticasEntrenador = async (req, res) => {
       };
     });
 
+    // 8. Enviar respuesta
     res.json({
       average_rating,
       total_reviews,
