@@ -61,16 +61,14 @@ exports.getServiciosConFiltros = async (req, res) => {
         cat.nombre AS category,
         u.id AS trainer_id, u.nombre AS trainer_first_name, u.apellido AS trainer_last_name, u.foto_perfil AS trainer_profile_picture,
 
-        -- Highlight image
+        -- Imagen destacada
         (SELECT ruta FROM imagenes_servicio img WHERE img.servicio_id = s.id LIMIT 1) AS highlight_image,
 
-        -- Trainer average rating (0 if none)
+        -- Calificación promedio del entrenador (nuevo modelo)
         IFNULL((
           SELECT AVG(c.calificacion)
           FROM comentarios c
-          JOIN contrataciones ct ON c.contratacion_id = ct.id
-          JOIN servicios sv ON ct.servicio_id = sv.id
-          WHERE sv.entrenador_id = s.entrenador_id
+          WHERE c.entrenador_id = u.id
         ), 0) AS trainer_average_rating
 
       FROM servicios s
@@ -78,18 +76,21 @@ exports.getServiciosConFiltros = async (req, res) => {
       JOIN zonas z ON s.zona_id = z.id
       JOIN usuarios u ON s.entrenador_id = u.id
       ${whereClause}
-      ${rating ? 'HAVING trainer_average_rating >= ?' : ''}
       ORDER BY trainer_average_rating DESC
       ${limit ? 'LIMIT ?' : ''}
     `;
 
-    if (rating) values.push(parseFloat(rating));
     if (limit) values.push(parseInt(limit));
 
     const [services] = await pool.query(sql, values);
-    res.json(services);
+
+    const filtered = rating
+      ? services.filter(s => parseFloat(s.trainer_average_rating) >= parseFloat(rating))
+      : services;
+
+    res.json(filtered);
   } catch (error) {
-    console.error('Error fetching filtered services:', error);
+    console.error('Error filtering services:', error);
     res.status(500).json({ message: 'Error filtering services' });
   }
 };
