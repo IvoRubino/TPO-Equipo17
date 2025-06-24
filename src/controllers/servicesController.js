@@ -95,12 +95,11 @@ exports.getServiciosConFiltros = async (req, res) => {
   }
 };
 
-//obtiene datos relevantes del servicio por Id
 exports.obtenerServicioPorId = async (req, res) => {
   const serviceId = parseInt(req.params.id);
 
   try {
-    // 1. Get service data
+    // 1. Obtener datos del servicio
     const [result] = await pool.query(
       `SELECT s.id, s.nombre AS name, s.descripcion, s.modalidad, s.direccion, s.precio,
               s.horario_inicio, s.horario_fin, s.duracion_minutos, s.cantidad_sesiones,
@@ -120,28 +119,26 @@ exports.obtenerServicioPorId = async (req, res) => {
 
     const servicio = result[0];
 
-    // 2. Inserta visualizaciones
+    // 2. Registrar visualización
     await pool.query('INSERT INTO visualizaciones (servicio_id) VALUES (?)', [serviceId]);
 
-    // 3. Saca las imagenes
+    // 3. Obtener imágenes
     const [images] = await pool.query(
       `SELECT ruta FROM imagenes_servicio WHERE servicio_id = ?`,
       [serviceId]
     );
 
-    // 4. Dias disponibles
+    // 4. Días disponibles
     const [days] = await pool.query(
       `SELECT dia FROM dias_servicio WHERE servicio_id = ?`,
       [serviceId]
     );
 
-    // 5. Saca el promedio del rating
+    // 5. Obtener promedio de calificaciones del entrenador
     const [averageResult] = await pool.query(
-      `SELECT AVG(com.calificacion) AS promedio
-       FROM comentarios com
-       JOIN contrataciones ct ON com.contratacion_id = ct.id
-       JOIN servicios s ON ct.servicio_id = s.id
-       WHERE s.entrenador_id = ?`,
+      `SELECT AVG(calificacion) AS promedio
+       FROM comentarios
+       WHERE entrenador_id = ?`,
       [servicio.entrenador_id]
     );
 
@@ -149,7 +146,17 @@ exports.obtenerServicioPorId = async (req, res) => {
       ? parseFloat(averageResult[0].promedio).toFixed(2)
       : null;
 
-    // 6. Enviar respuesta
+    // 6. Obtener reviews del entrenador
+    const [reviews] = await pool.query(
+      `SELECT c.calificacion, c.comentario, c.fecha_comentario,
+              u.nombre AS autor_nombre, u.apellido AS autor_apellido, u.foto_perfil AS autor_foto
+       FROM comentarios c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.entrenador_id = ?`,
+      [servicio.entrenador_id]
+    );
+
+    // 7. Enviar respuesta
     res.json({
       id: servicio.id,
       name: servicio.name,
@@ -170,7 +177,15 @@ exports.obtenerServicioPorId = async (req, res) => {
         first_name: servicio.entrenador_nombre,
         last_name: servicio.entrenador_apellido,
         profile_picture: servicio.foto_perfil,
-        average_rating
+        average_rating,
+        reviews: reviews.map(r => ({
+          rating: r.calificacion,
+          comment: r.comentario,
+          date: r.fecha_comentario,
+          author_first_name: r.autor_nombre,
+          author_last_name: r.autor_apellido,
+          author_picture: r.autor_foto
+        }))
       }
     });
   } catch (error) {
