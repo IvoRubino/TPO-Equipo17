@@ -346,11 +346,11 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
 
     // Convertir trainer_average_rating a número con 2 decimales (o null)
     const formatted = services.map(service => ({
-      ...service,
-      trainer_average_rating: service.trainer_average_rating
-        ? parseFloat(service.trainer_average_rating.toFixed(2))
-        : null
-    }));
+  ...service,
+  trainer_average_rating: service.trainer_average_rating != null
+    ? parseFloat(service.trainer_average_rating).toFixed(2)
+    : null
+}));
 
     res.json(formatted);
   } catch (error) {
