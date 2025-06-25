@@ -342,7 +342,7 @@ exports.subirArchivoContratacion = async (req, res) => {
       FROM contrataciones c
       JOIN servicios s ON c.servicio_id = s.id
       WHERE c.id = ?
-      AND c.estado = 'accepted'
+      AND c.estado = 'aceptado'
     `, [contractId]);
 
     if (contracts.length === 0) {
