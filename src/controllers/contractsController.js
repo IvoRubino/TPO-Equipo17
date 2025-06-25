@@ -95,6 +95,8 @@ exports.obtenerContratacionPorId = async (req, res) => {
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
           con.hora_inicio AS start_time,
+          s.horario_fin AS end_time,
+          s.duracion_minutos AS duration_minutes,
           EXISTS (
             SELECT 1 FROM comentarios com 
             WHERE com.cliente_id = ? AND com.entrenador_id = s.entrenador_id
@@ -119,6 +121,8 @@ exports.obtenerContratacionPorId = async (req, res) => {
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
           con.hora_inicio AS start_time,
+          s.horario_fin AS end_time,
+          s.duracion_minutos AS duration_minutes,
           EXISTS (
             SELECT 1 FROM comentarios com 
             WHERE com.cliente_id = con.cliente_id AND com.entrenador_id = ?
