@@ -45,4 +45,6 @@ router.get(
   verificarTokenOpcional,
   trainersController.obtenerServiciosDelEntrenador);
 
+router.get('/:id/busy-times', trainersController.obtenerDiasOcupados);
+
 module.exports = router;

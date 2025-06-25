@@ -339,3 +339,50 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.obtenerDiasOcupados = async (req, res) => {
+  const trainerId = parseInt(req.params.id, 10);
+
+  try {
+    const [contrataciones] = await pool.query(`
+      SELECT 
+        con.fecha_inicio,
+        con.hora_inicio,
+        s.duracion_minutos,
+        s.cantidad_sesiones
+      FROM contrataciones con
+      JOIN servicios s ON con.servicio_id = s.id
+      WHERE s.entrenador_id = ? AND con.estado = 'aceptado'
+    `, [trainerId]);
+
+    const busySlots = [];
+
+    for (const con of contrataciones) {
+      const startDate = new Date(con.fecha_inicio);
+      const [hours, minutes] = con.hora_inicio.split(':').map(Number);
+      const duration = con.duracion_minutos;
+      const sessionCount = con.cantidad_sesiones;
+
+      for (let i = 0; i < sessionCount; i++) {
+        const sessionDate = new Date(startDate);
+        sessionDate.setDate(startDate.getDate() + i * 7); // sumar semanas
+
+        const sessionStart = new Date(sessionDate);
+        sessionStart.setHours(hours, minutes, 0, 0);
+
+        const sessionEnd = new Date(sessionStart.getTime() + duration * 60000);
+
+        busySlots.push({
+          date: sessionDate.toISOString().split('T')[0], // YYYY-MM-DD
+          start_time: sessionStart.toTimeString().slice(0, 5), // HH:MM
+          end_time: sessionEnd.toTimeString().slice(0, 5)
+        });
+      }
+    }
+
+    res.json(busySlots);
+  } catch (error) {
+    console.error('Error fetching busy days:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
