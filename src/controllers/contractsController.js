@@ -123,7 +123,7 @@ exports.obtenerContratacionPorId = async (req, res) => {
           con.dia_semana AS weekday,
           con.hora_inicio AS start_time,
           s.horario_inicio AS service_start_time,
-          s.horario_fin AS service_end_time;
+          s.horario_fin AS service_end_time,
           s.duracion_minutos AS service_duration_minutes,
           EXISTS (
             SELECT 1 FROM comentarios com 
