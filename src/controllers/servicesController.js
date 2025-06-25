@@ -239,7 +239,8 @@ exports.crearServicio = async (req, res) => {
   }
 
   const validDays = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-  const selectedDays = Array.isArray(days) ? days.filter((d) => validDays.includes(d)) : [];
+  const selectedDaysRaw = Array.isArray(days) ? days : [days];
+  const selectedDays = selectedDaysRaw.filter((d) => validDays.includes(d));
 
   if (selectedDays.length === 0) {
     return res.status(400).json({ message: 'At least one valid day is required' });
@@ -269,7 +270,7 @@ exports.crearServicio = async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO servicios 
        (entrenador_id, categoria_id, nombre, descripcion, duracion_minutos, cantidad_sesiones, precio, modalidad, zona_id, direccion, horario_inicio, horario_fin)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         trainer_id,
         category_id,
