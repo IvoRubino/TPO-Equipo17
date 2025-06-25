@@ -13,6 +13,7 @@ exports.obtenerContrataciones = async (req, res) => {
           con.id AS contract_id,
           s.id AS service_id,
           s.nombre AS service_name,
+          s.cantidad_sesiones AS session_count,
           s.entrenador_id AS trainer_id,
           CONCAT(e.nombre, ' ', e.apellido) AS trainer,
           con.estado AS state,
@@ -29,13 +30,14 @@ exports.obtenerContrataciones = async (req, res) => {
         JOIN usuarios e ON s.entrenador_id = e.id
         WHERE con.cliente_id = ?
       `;
-      params = [id, id]; // 1 para el EXISTS, 1 para el WHERE
+      params = [id, id];
     } else if (tipo === 'entrenador') {
       query = `
         SELECT 
           con.id AS contract_id,
           s.id AS service_id,
           s.nombre AS service_name,
+          s.cantidad_sesiones AS session_count,
           con.cliente_id AS client_id,
           CONCAT(c.nombre, ' ', c.apellido) AS client,
           con.estado AS state,
@@ -52,13 +54,13 @@ exports.obtenerContrataciones = async (req, res) => {
         JOIN usuarios c ON con.cliente_id = c.id
         WHERE s.entrenador_id = ?
       `;
-      params = [id, id]; // 1 para el EXISTS, 1 para el WHERE
+      params = [id, id];
     } else {
       return res.status(403).json({ message: 'Unauthorized user type' });
     }
 
     const [result] = await pool.query(query, params);
-    // Transformar el resultado para que hasReview sea booleano real (0 → false, 1 → true)
+
     const data = result.map(row => ({
       ...row,
       hasReview: !!row.hasReview
@@ -70,7 +72,6 @@ exports.obtenerContrataciones = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching contracts' });
   }
 };
-
 
 exports.crearContrato = async (req, res) => {
   const { service_id } = req.body;
