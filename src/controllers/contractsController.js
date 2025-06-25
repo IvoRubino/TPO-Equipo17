@@ -301,6 +301,44 @@ exports.actualizarContrato = async (req, res) => {
   }
 };
 
+exports.getArchivosContratacion = async (req, res) => {
+  const contractId = parseInt(req.params.id);
+  const user = req.user;
+
+  try {
+    const [contracts] = await pool.query(`
+      SELECT c.*, s.entrenador_id
+      FROM contrataciones c
+      JOIN servicios s ON c.servicio_id = s.id
+      WHERE c.id = ?
+      AND c.estado = 'aceptado'
+    `, [contractId]);
+
+    if (contracts.length === 0) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+
+    const contract = contracts[0];
+    const isClient = contract.cliente_id === user.id;
+    const isTrainer = contract.entrenador_id === user.id;
+
+    if (!isClient && !isTrainer) {
+      return res.status(403).json({ message: 'You do not have permission to access these files' });
+    }
+
+    const [files] = await pool.query(`
+      SELECT archivo_id AS file_id, nombre AS name, ruta AS path, fecha_subida AS uploaded_at
+      FROM archivos_contratacion
+      WHERE contratacion_id = ?
+    `, [contractId]);
+
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching contract files:', error);
+    res.status(500).json({ message: 'Error retrieving files' });
+  }
+};
+
 exports.subirArchivoContratacion = async (req, res) => {
   const contractId = parseInt(req.params.id);
   const user = req.user;
