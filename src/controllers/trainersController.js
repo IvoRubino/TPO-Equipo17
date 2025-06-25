@@ -4,6 +4,7 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
   const trainerId = parseInt(req.params.id, 10);
 
   try {
+    // Obtener info del entrenador
     const [trainers] = await pool.query(
       `SELECT id, nombre, apellido, descripcion, foto_perfil
        FROM usuarios
@@ -17,13 +18,26 @@ exports.obtenerPerfilEntrenador = async (req, res) => {
 
     const trainer = trainers[0];
 
+    // Obtener calificación promedio
+    const [ratingResult] = await pool.query(
+      `SELECT AVG(calificacion) AS average_rating
+       FROM comentarios
+       WHERE entrenador_id = ?`,
+      [trainerId]
+    );
+
+    const average_rating = ratingResult[0].average_rating
+      ? parseFloat(ratingResult[0].average_rating).toFixed(2)
+      : null;
+
     return res.json({
       trainer: {
         id: trainer.id,
         first_name: trainer.nombre,
         last_name: trainer.apellido,
         description: trainer.descripcion,
-        profile_picture: trainer.foto_perfil
+        profile_picture: trainer.foto_perfil,
+        average_rating: average_rating ? Number(average_rating) : null
       }
     });
   } catch (error) {
