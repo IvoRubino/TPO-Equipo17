@@ -73,6 +73,84 @@ exports.obtenerContrataciones = async (req, res) => {
   }
 };
 
+exports.obtenerContratacionPorId = async (req, res) => {
+  const contractId = parseInt(req.params.id);
+  const { id: userId, tipo } = req.user;
+
+  try {
+    let query = '';
+    let params = [];
+
+    if (tipo === 'cliente') {
+      query = `
+        SELECT 
+          con.id AS contract_id,
+          s.id AS service_id,
+          s.nombre AS service_name,
+          s.cantidad_sesiones AS session_count,
+          s.entrenador_id AS trainer_id,
+          CONCAT(e.nombre, ' ', e.apellido) AS trainer,
+          con.estado AS state,
+          con.fecha_solicitud AS requested_at,
+          con.fecha_inicio AS start_date,
+          con.dia_semana AS weekday,
+          con.hora_inicio AS start_time,
+          EXISTS (
+            SELECT 1 FROM comentarios com 
+            WHERE com.cliente_id = ? AND com.entrenador_id = s.entrenador_id
+          ) AS hasReview
+        FROM contrataciones con
+        JOIN servicios s ON con.servicio_id = s.id
+        JOIN usuarios e ON s.entrenador_id = e.id
+        WHERE con.cliente_id = ? AND con.id = ?
+      `;
+      params = [userId, userId, contractId];
+    } else if (tipo === 'entrenador') {
+      query = `
+        SELECT 
+          con.id AS contract_id,
+          s.id AS service_id,
+          s.nombre AS service_name,
+          s.cantidad_sesiones AS session_count,
+          con.cliente_id AS client_id,
+          CONCAT(c.nombre, ' ', c.apellido) AS client,
+          con.estado AS state,
+          con.fecha_solicitud AS requested_at,
+          con.fecha_inicio AS start_date,
+          con.dia_semana AS weekday,
+          con.hora_inicio AS start_time,
+          EXISTS (
+            SELECT 1 FROM comentarios com 
+            WHERE com.cliente_id = con.cliente_id AND com.entrenador_id = ?
+          ) AS hasReview
+        FROM contrataciones con
+        JOIN servicios s ON con.servicio_id = s.id
+        JOIN usuarios c ON con.cliente_id = c.id
+        WHERE s.entrenador_id = ? AND con.id = ?
+      `;
+      params = [userId, userId, contractId];
+    } else {
+      return res.status(403).json({ message: 'Unauthorized user type' });
+    }
+
+    const [rows] = await pool.query(query, params);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Contract not found or access denied' });
+    }
+
+    const data = {
+      ...rows[0],
+      hasReview: !!rows[0].hasReview
+    };
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching contract:', error);
+    res.status(500).json({ message: 'Server error while fetching contract' });
+  }
+};
+
 exports.crearContrato = async (req, res) => {
   const { service_id } = req.body;
   const user = req.user;
