@@ -358,6 +358,8 @@ exports.obtenerDiasOcupados = async (req, res) => {
     const busySlots = [];
 
     for (const con of contrataciones) {
+      if (!con.fecha_inicio || !con.hora_inicio) continue; // ⛔️ saltar contrataciones incompletas
+
       const startDate = new Date(con.fecha_inicio);
       const [hours, minutes] = con.hora_inicio.split(':').map(Number);
       const duration = con.duracion_minutos;
@@ -365,7 +367,7 @@ exports.obtenerDiasOcupados = async (req, res) => {
 
       for (let i = 0; i < sessionCount; i++) {
         const sessionDate = new Date(startDate);
-        sessionDate.setDate(startDate.getDate() + i * 7); // sumar semanas
+        sessionDate.setDate(startDate.getDate() + i * 7);
 
         const sessionStart = new Date(sessionDate);
         sessionStart.setHours(hours, minutes, 0, 0);
@@ -373,8 +375,8 @@ exports.obtenerDiasOcupados = async (req, res) => {
         const sessionEnd = new Date(sessionStart.getTime() + duration * 60000);
 
         busySlots.push({
-          date: sessionDate.toISOString().split('T')[0], // YYYY-MM-DD
-          start_time: sessionStart.toTimeString().slice(0, 5), // HH:MM
+          date: sessionDate.toISOString().split('T')[0],
+          start_time: sessionStart.toTimeString().slice(0, 5),
           end_time: sessionEnd.toTimeString().slice(0, 5)
         });
       }
