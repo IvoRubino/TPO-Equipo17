@@ -24,7 +24,7 @@ router.patch('/:id', verificarToken, validarBodyNoVacio, contractsController.act
 router.get('/:id/files', verificarToken, contractsController.getArchivosContratacion);
 
 //POST para files
-router.post('/:id/files', verificarToken, uploadFiles.single('archivo'), contractsController.subirArchivoContratacion);
+router.post('/:id/files', verificarToken, uploadFiles.single('file'), contractsController.subirArchivoContratacion);
 
 
 module.exports = router;
