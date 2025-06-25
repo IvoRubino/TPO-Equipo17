@@ -302,12 +302,12 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
   const user = req.user; // gracias a verificarTokenOpcional
 
   try {
-    // Si está autenticado y es el mismo entrenador → mostrar todo
     const isOwner = user && user.id === trainerId && user.tipo === 'entrenador';
 
     let query = `
       SELECT 
         s.id,
+        s.nombre AS name,
         cat.nombre AS category,
         s.descripcion AS description,
         s.duracion_minutos AS duration_minutes,
@@ -318,7 +318,18 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
         s.horario_inicio AS start_time,
         s.horario_fin AS end_time,
         s.precio AS price,
-        s.estado AS status
+        s.estado AS status,
+
+        -- Highlight image
+        (SELECT ruta FROM imagenes_servicio img WHERE img.servicio_id = s.id LIMIT 1) AS highlight_image,
+
+        -- Trainer average rating
+        (
+          SELECT AVG(c.calificacion)
+          FROM comentarios c
+          WHERE c.entrenador_id = s.entrenador_id
+        ) AS trainer_average_rating
+
       FROM servicios s
       JOIN categorias cat ON s.categoria_id = cat.id
       JOIN zonas z ON s.zona_id = z.id
@@ -327,18 +338,27 @@ exports.obtenerServiciosDelEntrenador = async (req, res) => {
 
     const params = [trainerId];
 
-    // Si no es el dueño, filtrar solo servicios publicados
     if (!isOwner) {
       query += ` AND s.estado = 'publicado'`;
     }
 
     const [services] = await pool.query(query, params);
-    res.json(services);
+
+    // Convertir trainer_average_rating a número con 2 decimales (o null)
+    const formatted = services.map(service => ({
+      ...service,
+      trainer_average_rating: service.trainer_average_rating
+        ? parseFloat(service.trainer_average_rating.toFixed(2))
+        : null
+    }));
+
+    res.json(formatted);
   } catch (error) {
     console.error('Error getting trainer services:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 exports.obtenerDiasOcupados = async (req, res) => {
   const trainerId = parseInt(req.params.id, 10);
