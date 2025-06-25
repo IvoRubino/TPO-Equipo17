@@ -93,7 +93,7 @@ exports.forgotPassword = async (req, res) => {
 
 // Reset Password
 exports.resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { token, password, confirmPassword } = req.body;
 
   try {
     const [resets] = await pool.query('SELECT * FROM password_resets WHERE token = ?', [token]);
@@ -110,16 +110,19 @@ exports.resetPassword = async (req, res) => {
     const email = reset.correo;
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\[\]{};':"\\|,.<>/?]).{8,}$/;
-    if (!passwordRegex.test(newPassword)) {
+    if (!passwordRegex.test(password)) {
       return res.status(400).json({
         message: 'Password must be at least 8 characters long and include an uppercase letter, a number, and a special character.'
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query('UPDATE usuarios SET password = ? WHERE correo = ?', [hashedPassword, email]);
-
     await pool.query('DELETE FROM password_resets WHERE correo = ?', [email]);
 
     res.json({ message: 'Password updated successfully' });
