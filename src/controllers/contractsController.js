@@ -94,7 +94,7 @@ exports.obtenerContratacionPorId = async (req, res) => {
           con.fecha_solicitud AS requested_at,
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
-          s.hora_inicio AS start_time,
+          s.horario_inicio AS start_time,
           s.horario_fin AS end_time,
           s.duracion_minutos AS duration_minutes,
           EXISTS (
@@ -120,7 +120,7 @@ exports.obtenerContratacionPorId = async (req, res) => {
           con.fecha_solicitud AS requested_at,
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
-          s.hora_inicio AS start_time,
+          s.horario_inicio AS start_time,
           s.horario_fin AS end_time,
           s.duracion_minutos AS duration_minutes,
           EXISTS (
@@ -154,6 +154,7 @@ exports.obtenerContratacionPorId = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching contract' });
   }
 };
+
 
 exports.crearContrato = async (req, res) => {
   const { service_id } = req.body;
