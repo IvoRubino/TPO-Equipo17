@@ -19,13 +19,17 @@ exports.obtenerContrataciones = async (req, res) => {
           con.fecha_solicitud AS requested_at,
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
-          con.hora_inicio AS start_time
+          con.hora_inicio AS start_time,
+          EXISTS (
+            SELECT 1 FROM comentarios com 
+            WHERE com.cliente_id = ? AND com.entrenador_id = s.entrenador_id
+          ) AS hasReview
         FROM contrataciones con
         JOIN servicios s ON con.servicio_id = s.id
         JOIN usuarios e ON s.entrenador_id = e.id
         WHERE con.cliente_id = ?
       `;
-      params = [id];
+      params = [id, id]; // 1 para el EXISTS, 1 para el WHERE
     } else if (tipo === 'entrenador') {
       query = `
         SELECT 
@@ -38,19 +42,29 @@ exports.obtenerContrataciones = async (req, res) => {
           con.fecha_solicitud AS requested_at,
           con.fecha_inicio AS start_date,
           con.dia_semana AS weekday,
-          con.hora_inicio AS start_time
+          con.hora_inicio AS start_time,
+          EXISTS (
+            SELECT 1 FROM comentarios com 
+            WHERE com.cliente_id = con.cliente_id AND com.entrenador_id = ?
+          ) AS hasReview
         FROM contrataciones con
         JOIN servicios s ON con.servicio_id = s.id
         JOIN usuarios c ON con.cliente_id = c.id
         WHERE s.entrenador_id = ?
       `;
-      params = [id];
+      params = [id, id]; // 1 para el EXISTS, 1 para el WHERE
     } else {
       return res.status(403).json({ message: 'Unauthorized user type' });
     }
 
     const [result] = await pool.query(query, params);
-    res.json(result);
+    // Transformar el resultado para que hasReview sea booleano real (0 → false, 1 → true)
+    const data = result.map(row => ({
+      ...row,
+      hasReview: !!row.hasReview
+    }));
+
+    res.json(data);
   } catch (error) {
     console.error('Error fetching contracts:', error);
     res.status(500).json({ message: 'Server error while fetching contracts' });
