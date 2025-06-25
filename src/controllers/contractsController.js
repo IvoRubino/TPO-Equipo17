@@ -191,7 +191,7 @@ exports.crearContrato = async (req, res) => {
 
 exports.actualizarContrato = async (req, res) => {
   const contractId = req.params.id;
-  const { status, start_date, day_of_week, start_time } = req.body;
+  const { status, start_date, start_time } = req.body;
   const user = req.user;
 
   try {
@@ -209,6 +209,7 @@ exports.actualizarContrato = async (req, res) => {
 
     const contract = contracts[0];
 
+    // 1. Estado
     if (status) {
       if (!['aceptado', 'cancelado', 'completado'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
@@ -232,15 +233,13 @@ exports.actualizarContrato = async (req, res) => {
       await pool.query('UPDATE contrataciones SET estado = ? WHERE id = ?', [status, contractId]);
     }
 
-    const wantsToSchedule =
-      start_date !== undefined ||
-      day_of_week !== undefined ||
-      start_time !== undefined;
+    // 2. Programación
+    const wantsToSchedule = start_date !== undefined || start_time !== undefined;
 
     if (wantsToSchedule) {
-      if (!start_date || !day_of_week || !start_time) {
+      if (!start_date || !start_time) {
         return res.status(400).json({
-          message: 'Missing fields for scheduling: start_date, day_of_week and start_time are required'
+          message: 'Missing fields for scheduling: start_date and start_time are required'
         });
       }
 
@@ -248,23 +247,31 @@ exports.actualizarContrato = async (req, res) => {
         return res.status(403).json({ message: 'Only the client can schedule the session' });
       }
 
-      if (contract.estado !== 'accepted') {
+      if (contract.estado !== 'aceptado') {
         return res.status(400).json({ message: 'The contract must be accepted before scheduling' });
       }
 
+      // Calcular día de la semana
+      const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+      const parsedDate = new Date(start_date);
+      const dayOfWeek = diasSemana[parsedDate.getDay()]; // 0=domingo, 1=lunes, ...
+
+      // Verificar si el servicio permite ese día
       const [allowedDays] = await pool.query(
         'SELECT * FROM dias_servicio WHERE servicio_id = ? AND dia = ?',
-        [contract.servicio_id, day_of_week]
+        [contract.servicio_id, dayOfWeek]
       );
 
       if (allowedDays.length === 0) {
-        return res.status(400).json({ message: `The service is not available on ${day_of_week}` });
+        return res.status(400).json({ message: `The service is not available on ${dayOfWeek}` });
       }
 
+      // Verificar horario permitido
       if (start_time < contract.service_start_time || start_time >= contract.horario_fin) {
         return res.status(400).json({ message: 'Selected time is outside available hours' });
       }
 
+      // Verificar solapamiento
       const [overlaps] = await pool.query(
         `SELECT * FROM contrataciones
          WHERE servicio_id = ?
@@ -272,7 +279,7 @@ exports.actualizarContrato = async (req, res) => {
            AND id != ?
            AND dia_semana = ?
            AND hora_inicio = ?`,
-        [contract.servicio_id, contractId, day_of_week, start_time]
+        [contract.servicio_id, contractId, dayOfWeek, start_time]
       );
 
       if (overlaps.length > 0) {
@@ -283,7 +290,7 @@ exports.actualizarContrato = async (req, res) => {
         `UPDATE contrataciones
          SET dia_semana = ?, hora_inicio = ?, fecha_inicio = ?
          WHERE id = ?`,
-        [day_of_week, start_time, start_date, contractId]
+        [dayOfWeek, start_time, start_date, contractId]
       );
     }
 
@@ -291,44 +298,6 @@ exports.actualizarContrato = async (req, res) => {
   } catch (error) {
     console.error('Error updating contract:', error);
     res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.getArchivosContratacion = async (req, res) => {
-  const contractId = parseInt(req.params.id);
-  const user = req.user;
-
-  try {
-    const [contracts] = await pool.query(`
-      SELECT c.*, s.entrenador_id
-      FROM contrataciones c
-      JOIN servicios s ON c.servicio_id = s.id
-      WHERE c.id = ?
-      AND c.estado = 'aceptado'
-    `, [contractId]);
-
-    if (contracts.length === 0) {
-      return res.status(404).json({ message: 'Contract not found' });
-    }
-
-    const contract = contracts[0];
-    const isClient = contract.cliente_id === user.id;
-    const isTrainer = contract.entrenador_id === user.id;
-
-    if (!isClient && !isTrainer) {
-      return res.status(403).json({ message: 'You do not have permission to access these files' });
-    }
-
-    const [files] = await pool.query(`
-      SELECT archivo_id AS file_id, nombre AS name, ruta AS path, fecha_subida AS uploaded_at
-      FROM archivos_contratacion
-      WHERE contratacion_id = ?
-    `, [contractId]);
-
-    res.json(files);
-  } catch (error) {
-    console.error('Error fetching contract files:', error);
-    res.status(500).json({ message: 'Error retrieving files' });
   }
 };
 
